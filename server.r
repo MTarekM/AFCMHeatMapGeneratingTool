@@ -14,6 +14,7 @@ library(png)
 
 server <- shinyServer(function(input, output) {	
   
+  
   # sample Matrix download
   output$downloadSample <- downloadHandler(
     filename <- function() {
@@ -26,7 +27,7 @@ server <- shinyServer(function(input, output) {
   )
  
   #  user file upload
-  datasetInput <- reactive({
+  matrixInput <- reactive({
     validate(
       need(input$filename != 0, "To generate a heatmap using AFCM Generation tool, please upload your *.CSV file") 
     )
@@ -34,26 +35,29 @@ server <- shinyServer(function(input, output) {
     if (is.null(inFile)) return(NULL)
     read.table(inFile$datapath, header= TRUE, sep=",", quote='"', row.names=1)
   })
- 
+  
+
+  
+  
   # filter AFCMstats table based on user cutoffs
   AFCMstats <- reactive({
     AFCMres_df <- AFCMstatse()
-    datasetInputTwo <- datasetInput()
+    matrixInputTwo <- matrixInput()
     
     if (input$bothPvalueFDR == "Pvalue"){
       pNAFCMres_df <- AFCMres_df[which(AFCMres_df$PValue<input$userPvalue),]
       pafcmno <- row.names(pNAFCMres_df)
-      pFinalResult <- datasetInputTwo[pafcmno,]
+      pFinalResult <- matrixInputTwo[pafcmno,]
     }
     else if(input$bothPvalueFDR == "FDR"){
       fNAFCMres_df <- AFCMres_df[which(AFCMres_df$FDR<input$userFDR),]
       fafcmno <- row.names(fNAFCMres_df)
-      fFinalResult <- datasetInputTwo[fafcmno,]
+      fFinalResult <- matrixInputTwo[fafcmno,]
     }
     else if(input$bothPvalueFDR == "both"){
       bNAFCMres_df <- AFCMres_df[which(AFCMres_df$FDR<input$userFDR & AFCMres_df$PValue<input$userPvalue),]
       bafcmno <- row.names(bNAFCMres_df)
-      bFinalResult <- datasetInputTwo[bafcmno,]
+      bFinalResult <- matrixInputTwo[bafcmno,]
     }
   })
   
@@ -72,7 +76,7 @@ server <- shinyServer(function(input, output) {
   
   
   # data Log transformation 
-  log2_datasetInput <- reactive({
+  log2_matrixInput <- reactive({
     AFCMstats()
     cpm(AFCMstats(), prior.count=2, log=TRUE)
   })
@@ -88,7 +92,7 @@ server <- shinyServer(function(input, output) {
     ))}   
     else {
       d3heatmap( 
-        if (input$log2_transform) log2_datasetInput() else AFCMstats(),
+        if (input$log2_transform) log2_matrixInput() else AFCMstats(),
       #  cexRow = as.numeric(as.character(input$xfontsize)),
        # cexCol = as.numeric(as.character(input$yfontsize)),
       cexRow = 0.5,
@@ -101,10 +105,10 @@ server <- shinyServer(function(input, output) {
       )  
     }
   })
-  
+
   # edgeR data preparation for Normalization
   output$noncontrol <- renderUI({
-    df <- datasetInput()
+    df <- matrixInput()
     if (is.null(df)) return(NULL)
     noncontrol <- names(df)
     selectInput('noncontrol', 'Please select the noncontrol samples:', choices = noncontrol, multiple = TRUE)
@@ -113,26 +117,27 @@ server <- shinyServer(function(input, output) {
   
   #  edgeR function for statistics
   AFCMstatse <- reactive({
-    if(!is.null(datasetInput()) & !is.null(input$noncontrol)){
+    if(!is.null(matrixInput()) & !is.null(input$noncontrol)){
       
-      group <- as.numeric(names(datasetInput()) %in% input$noncontrol)
-      y <- DGEList(counts = datasetInput(), group = group)
+      group <- as.numeric(names(matrixInput()) %in% input$noncontrol)
+      y <- DGEList(counts = matrixInput(), group = group)
       y <- calcNormFactors(y)
       y <- estimateCommonDisp(y)
       y <- estimateTagwiseDisp(y)
       et <- exactTest(y)
       results <- topTags(et, n=1000000)
-      results_df <- as.data.frame(results)
+      AFCMres_df <- as.data.frame(results)
       
     }
   })
-  # d3heatmap output
+   
+  # Heatmap Rendering
   output$heatmap <- renderD3heatmap({
-    if(!is.null(datasetInput()))
+    if(!is.null(matrixInput()))
       plot()
   })
  
-  # d3heatmap download								
+  # Heatmap download								
   output$downloadHeatmap <- downloadHandler(
     filename = function() {
       paste0(basename(file_path_sans_ext(input$filename)), '.html')
@@ -142,8 +147,4 @@ server <- shinyServer(function(input, output) {
     }
   )
  
-  
-  
-  
-  
 })
