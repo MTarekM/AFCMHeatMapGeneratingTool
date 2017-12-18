@@ -8,7 +8,7 @@ Contact: mohammadtareq459@gmail.com
 
 The Authors are very thankful to the authors of the paper entitled “MicroScope: ChIP-seq and RNA-seq software analysis suite for gene expression heatmaps” [1], for providing their source code freely available on github[2], in which their developed functions have helped so much to use the required package for this ShinyApp.
 
-In server file the AFCMstats Function was inspired by the authors SlimStats function submitted to their references repository with customization to limit visualization spaces and give more space to user specific zooming.
+In server file the AFCMstats Function was inspired by the authors SlimStats function submitted to their referenced repository with customization to limit visualization spaces and give more space to user specific zooming.
 The referenced repositiory was also of great help considering Usage of edgeR package functions for data analysis.
 
 References:
