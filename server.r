@@ -7,18 +7,15 @@
 library(shiny)
 library(d3heatmap)
 library(htmlwidgets)
-library(tools)
 library(edgeR)
 library(dplyr)
 library(png)
 
-# backend 
+
 server <- shinyServer(function(input, output) {	
   
-  
-  
-  # sample file download
-  output$downloadData <- downloadHandler(
+  # sample Matrix download
+  output$downloadSample <- downloadHandler(
     filename <- function() {
       paste('SampleFile', '.csv', sep='')
     },
@@ -27,9 +24,8 @@ server <- shinyServer(function(input, output) {
     },
     contentType = "text/csv"
   )
-  
-  
-  # file upload
+ 
+  #  user file upload
   datasetInput <- reactive({
     validate(
       need(input$filename != 0, "To generate a heatmap using AFCM Generation tool, please upload your *.CSV file") 
@@ -38,27 +34,26 @@ server <- shinyServer(function(input, output) {
     if (is.null(inFile)) return(NULL)
     read.table(inFile$datapath, header= TRUE, sep=",", quote='"', row.names=1)
   })
-  
-  
-  # filter stats table based on cutoffs
-  slimStats <- reactive({
-    results_df <- stats()
+ 
+  # filter AFCMstats table based on user cutoffs
+  AFCMstats <- reactive({
+    AFCMres_df <- AFCMstatse()
     datasetInputTwo <- datasetInput()
     
-    if (input$pvFDRchoose == "Pvalue"){
-      pNewResults_df <- results_df[which(results_df$PValue<input$statPV),]
-      pNames <- row.names(pNewResults_df)
-      pFinalResult <- datasetInputTwo[pNames,]
+    if (input$bothPvalueFDR == "Pvalue"){
+      pNAFCMres_df <- AFCMres_df[which(AFCMres_df$PValue<input$userPvalue),]
+      pafcmno <- row.names(pNAFCMres_df)
+      pFinalResult <- datasetInputTwo[pafcmno,]
     }
-    else if(input$pvFDRchoose == "FDR"){
-      fNewResults_df <- results_df[which(results_df$FDR<input$statFDR),]
-      fNames <- row.names(fNewResults_df)
-      fFinalResult <- datasetInputTwo[fNames,]
+    else if(input$bothPvalueFDR == "FDR"){
+      fNAFCMres_df <- AFCMres_df[which(AFCMres_df$FDR<input$userFDR),]
+      fafcmno <- row.names(fNAFCMres_df)
+      fFinalResult <- datasetInputTwo[fafcmno,]
     }
-    else if(input$pvFDRchoose == "both"){
-      bNewResults_df <- results_df[which(results_df$FDR<input$statFDR & results_df$PValue<input$statPV),]
-      bNames <- row.names(bNewResults_df)
-      bFinalResult <- datasetInputTwo[bNames,]
+    else if(input$bothPvalueFDR == "both"){
+      bNAFCMres_df <- AFCMres_df[which(AFCMres_df$FDR<input$userFDR & AFCMres_df$PValue<input$userPvalue),]
+      bafcmno <- row.names(bNAFCMres_df)
+      bFinalResult <- datasetInputTwo[bafcmno,]
     }
   })
   
@@ -66,42 +61,26 @@ server <- shinyServer(function(input, output) {
   # heatmap height
   output$pixelation <- renderUI({
      
-    slimStats()
-    inputLines <- NROW(slimStats())
-    if(inputLines >= 0 && inputLines <= 2001){
-      d3heatmapOutput("heatmap", width = "100%", height = "900px")
-    }
-    else if(inputLines > 2001 && inputLines <= 5001){
-      d3heatmapOutput("heatmap", width = "100%", height = "1700px")
-    }
-    else if(inputLines > 5001 && inputLines <= 10001){
-      d3heatmapOutput("heatmap", width = "100%", height = "3200px")
-    }
-    else if(inputLines > 10001 && inputLines <= 20001){
-      d3heatmapOutput("heatmap", width = "100%", height = "9000px")
-    }
-    else if(inputLines > 20001 && inputLines <= 40001){
-      d3heatmapOutput("heatmap", width = "100%", height = "13000px")
-    }
-    else if(inputLines > 40001 && inputLines <= 60001){
-      d3heatmapOutput("heatmap", width = "100%", height = "18000px")
-    }
+    AFCMstats()
+    inputLines <- NROW(AFCMstats())
+    if(inputLines >= 0 && inputLines <= 1000)
+      d3heatmapOutput("heatmap", width = "100%", height = "1000px")
     else
-      d3heatmapOutput("heatmap", width = "100%", height = "30000px")
+      d3heatmapOutput("heatmap", width = "100%", height = "10000px")
     
   })	
   
   
-  # log2 data transformation
+  # data Log transformation 
   log2_datasetInput <- reactive({
-    slimStats()
-    cpm(slimStats(), prior.count=2, log=TRUE)
+    AFCMstats()
+    cpm(AFCMstats(), prior.count=2, log=TRUE)
   })
   
   
-  # d3heatmap prep					
+  # d3heatmap functions					
   plot <- reactive({
-    df = slimStats()
+    df = AFCMstats()
     if (input$goButtonHeat == 0) {return(validate(
       need(input$filename != 0, "To generate a heatmap using AFCM Generation tool, please  select a *.CSV"),
       need(input$goButtonHeat !=0 , "for viewing statistically significant genes, please select desired parameters then  press 'Draw Heatmap'"),
@@ -109,27 +88,50 @@ server <- shinyServer(function(input, output) {
     ))}   
     else {
       d3heatmap( 
-        if (input$log2_transformed_data) log2_datasetInput() else slimStats(),
-        cexRow = as.numeric(as.character(input$xfontsize)),
-        cexCol = as.numeric(as.character(input$yfontsize)),
-        colors = input$choose,
-        k_row = input$color_row_branches,
-        k_col = input$color_column_branches,
-        dendrogram = input$dendrogram
+        if (input$log2_transform) log2_datasetInput() else AFCMstats(),
+      #  cexRow = as.numeric(as.character(input$xfontsize)),
+       # cexCol = as.numeric(as.character(input$yfontsize)),
+      cexRow = 0.5,
+      cexCol = 0.5,
+      k_row = input$color_row_branches,
+      k_col = input$color_column_branches,
+      userdendrogram = input$userdendrogram,
+      colors = input$choosecolor
+       
       )  
     }
   })
   
+  # edgeR data preparation for Normalization
+  output$noncontrol <- renderUI({
+    df <- datasetInput()
+    if (is.null(df)) return(NULL)
+    noncontrol <- names(df)
+    selectInput('noncontrol', 'Please select the noncontrol samples:', choices = noncontrol, multiple = TRUE)
+  })			
   
+  
+  #  edgeR function for statistics
+  AFCMstatse <- reactive({
+    if(!is.null(datasetInput()) & !is.null(input$noncontrol)){
+      
+      group <- as.numeric(names(datasetInput()) %in% input$noncontrol)
+      y <- DGEList(counts = datasetInput(), group = group)
+      y <- calcNormFactors(y)
+      y <- estimateCommonDisp(y)
+      y <- estimateTagwiseDisp(y)
+      et <- exactTest(y)
+      results <- topTags(et, n=1000000)
+      results_df <- as.data.frame(results)
+      
+    }
+  })
   # d3heatmap output
   output$heatmap <- renderD3heatmap({
     if(!is.null(datasetInput()))
       plot()
   })
-  
-  
  
-  
   # d3heatmap download								
   output$downloadHeatmap <- downloadHandler(
     filename = function() {
@@ -139,39 +141,7 @@ server <- shinyServer(function(input, output) {
       saveWidget(plot(), file)
     }
   )
-  
-  
  
-  
-  
-  # edgeR prep
-  output$expcolumns <- renderUI({
-    df <- datasetInput()
-    if (is.null(df)) return(NULL)
-    expcolumns <- names(df)
-    selectInput('expcolumns', 'Please select the non-control samples:', choices = expcolumns, multiple = TRUE)
-  })			
-  
-  
-  # edgeR statistical engine
-  stats <- reactive({
-    if(!is.null(datasetInput()) & !is.null(input$expcolumns)){
-      
-      group <- as.numeric(names(datasetInput()) %in% input$expcolumns)
-      y <- DGEList(counts = datasetInput(), group = group)
-      y <- calcNormFactors(y)
-      y <- estimateCommonDisp(y)
-      y <- estimateTagwiseDisp(y)
-      et <- exactTest(y)
-      results <- topTags(et, n=50000)
-      results_df <- as.data.frame(results)
-      
-    }
-  })
-  
-  
- 
-  
   
   
   
